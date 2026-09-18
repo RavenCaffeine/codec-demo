@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Bottleneck Capacity and Training Strategies in Neural Speech Codecs</title>
+<title>What Makes Speech Codec Good?</title>
 <style>
   :root{
     --ink:#16181d; --ink-2:#4a5058; --ink-3:#767d87;
@@ -34,7 +34,7 @@
   }
   h1{
     margin:0 0 22px; font-size:clamp(25px,3.6vw,38px); line-height:1.25;
-    font-weight:680; letter-spacing:-.015em; max-width:22ch;
+    font-weight:680; letter-spacing:-.015em; max-width:25ch;
   }
   h1 .sub{display:block; font-size:.66em; font-weight:520; color:var(--ink-2); margin-top:.45em; letter-spacing:0}
   .authors{margin:0 0 6px; font-size:17px; color:var(--ink)}
@@ -81,7 +81,7 @@
   }
   .cond{margin:0 0 22px; font-size:14.5px; color:var(--ink-3)}
   .abstract p{margin:0; font-size:16.5px; line-height:1.78; color:var(--ink-2); max-width:78ch}
-  .kw{margin-top:18px; font-size:14.5px; color:var(--ink-3)}
+  .abstract p.kw{margin-top:20px; font-size:14.5px; color:var(--ink-3)}
   .kw b{color:var(--ink-2); font-weight:600}
 
   /* ---------- tables ---------- */
@@ -150,8 +150,8 @@
 
 <header class="hero">
   <div class="wrap">
-    <h1>Bottleneck Capacity and Training Strategies in Neural Speech Codecs
-      <span class="sub">A Multi-Attribute Reconstruction Study</span>
+    <h1>What Makes Speech Codec Good?
+      <span class="sub">Controlled Empirical Evaluation of Neural Speech Codec Design</span>
     </h1>
     <p class="authors">
       <span>Mengze Ge<sup>*</sup></span>,
@@ -159,7 +159,7 @@
       <span>Haowei Lou</span>,
       <span>Lina Yao</span>
     </p>
-    <p class="affil">The University of New South Wales</p>
+    <p class="affil">The University of New South Wales, Australia</p>
     <p class="emails">{mengze.ge, qingbo.meng, haowei.lou, lina.yao}@unsw.edu.au</p>
     <p class="note"><sup>*</sup>Equal contribution. Submitted to ICASSP 2027.</p>
 
@@ -176,11 +176,11 @@
 <nav class="toc">
   <div class="wrap">
     <a href="#abstract">Abstract</a>
-    <a href="#data_size">Data size</a>
+    <a href="#data_size">Data scale</a>
     <a href="#hop_size">Hop size</a>
-    <a href="#dimension">Feature dim.</a>
-    <a href="#codebook">Codebook size</a>
-    <a href="#rvq">RVQ depth</a>
+    <a href="#dimension">Feature dim</a>
+    <a href="#codebook">Codebook width</a>
+    <a href="#rvq">Codebook depth</a>
   </div>
 </nav>
 
@@ -189,22 +189,19 @@
     <div class="wrap">
       <h2>Abstract</h2>
       <p>
-        Neural speech codecs are widely used in speech compression, text-to-speech generation,
-        and speech language models. Their performance depends on many design and training
-        choices, while different applications may value reconstruction quality, perceptual
-        quality, linguistic content, pitch, speaker identity, or compression efficiency
-        differently. However, existing codec comparisons often change several factors at the
-        same time, making it difficult to understand the effect of each design choice. In this
-        work, we study how major codec design factors affect different aspects of speech
-        reconstruction under a same backbone and evaluation pipeline. We vary training data
-        scale, latent frame rate, representation dimensionality, codebook size, Residual Vector
-        Quantization (RVQ) depth, and training strategy while keeping other settings fixed
-        whenever possible. We evaluate all configurations with the same metrics for spectral
-        reconstruction, perceptual quality, linguistic content, pitch, speaker similarity, and
-        compression efficiency. All the code, dataset, evaluation pipeline and pretrained model
-        presented in this paper will be open-sourced upon paper acceptance.
+        Neural speech codecs are widely used in modern speech and multimodal systems, yet
+        their performance depends on many intertwined design and training variables. Existing
+        codec comparisons often change several variables simultaneously, making it difficult
+        to determine which variables matter most. In this work, we conduct a controlled
+        empirical study using a unified codec backbone and evaluation pipeline. We
+        independently vary five variables: training data scale, temporal resolution, latent
+        feature dimension, codebook width, and RVQ depth. Our results show that temporal
+        resolution has a strong impact on codec quality, while latent dimension can be reduced
+        substantially with limited performance degradation. Increasing RVQ depth is also more
+        effective than simply enlarging the codebook, and training data exhibits clear
+        diminishing returns. These findings provide insights for speech codec design.
       </p>
-      <p class="kw"><b>Index Terms —</b> neural audio codec, speech tokenization, speech reconstruction quality evaluation</p>
+      <p class="kw"><b>Index Terms —</b> neural audio codec, speech tokenization, quality evaluation</p>
     </div>
   </section>
 
@@ -238,67 +235,69 @@
    Audio file paths come from manifest.js (regenerate with build_manifest.py).
 ------------------------------------------------------------------ */
 const METRIC_COLS = ["Mel-MAE ↓","MCD ↓","PESQ ↑","F0-RMSE ↓","F0-CORR ↑",
-                     "WER ↓","PER ↓","SPK-SIM ↑","UT-MOS ↑","CMOS ↑"];
+                     "WER ↓","PER ↓","SPK-SIM ↑","UT-MOS ↑","CMOS ↑","kbps ↓"];
+
+const GT_ROW = ["–","–","–","–","–","4.38%","3.20%","–","2.760","–","512"];
 
 const FACTORS = [
   {
-    key:"data_size", tag:"(a)", title:"Training data size",
-    cond:"H = 256, D = 192, no quantizer, 1M updates. Hours of training speech.",
+    key:"data_size", tag:"(a)", title:"Data scale",
+    cond:"Hours of training speech.",
     unitHead:"Hours",
     rows:[
-      {id:"1h",     label:"1",      m:["0.364","5.108","1.771","75.45","0.535","5.64%","4.24%","0.976","1.636","−2.00"]},
-      {id:"10h",    label:"10",     m:["0.204","3.846","3.121","53.19","0.748","4.50%","3.24%","0.992","2.532","−0.75"]},
-      {id:"100h",   label:"100",    m:["0.191","3.834","3.195","51.52","0.750","4.69%","3.57%","0.991","2.625","−0.67"]},
-      {id:"1000h",  label:"1,000",  m:["0.192","3.909","3.194","51.87","0.749","4.54%","3.33%","0.991","2.667","−0.50"]},
-      {id:"10000h", label:"10,000", ref:true, m:["0.196","3.830","3.206","50.91","0.757","4.65%","3.42%","0.991","2.594","0"]}
+      {id:"1h",     label:"1",      m:["0.364","5.108","1.771","75.45","0.535","5.64%","4.24%","0.976","1.636","−2.10","384"]},
+      {id:"10h",    label:"10",     m:["0.204","3.846","3.121","53.19","0.748","4.50%","3.24%","0.992","2.532","−0.25","384"]},
+      {id:"100h",   label:"100",    m:["0.191","3.834","3.195","51.52","0.750","4.69%","3.57%","0.991","2.625","−0.10","384"]},
+      {id:"1000h",  label:"1,000",  m:["0.192","3.909","3.194","51.87","0.749","4.54%","3.33%","0.991","2.667","−0.15","384"]},
+      {id:"10000h", label:"10,000", ref:true, m:["0.196","3.830","3.206","50.91","0.757","4.65%","3.42%","0.991","2.594","0.00","384"]}
     ]
   },
   {
-    key:"hop_size", tag:"(b)", title:"Hop size / latent frame rate",
-    cond:"10k hours, D = 192, no quantizer, 1M updates. Larger hop = lower frame rate.",
-    unitHead:"Hop (rate)",
+    key:"hop_size", tag:"(b)", title:"Hop size / frequency",
+    cond:"Hop size in samples and the latent frame rate it produces.",
+    unitHead:"Hop / Hz",
     rows:[
-      {id:"hop256",  label:"256",  unit:"62.5 Hz",   ref:true, m:["0.196","3.830","3.206","50.91","0.757","4.65%","3.39%","0.991","2.594","0"]},
-      {id:"hop512",  label:"512",  unit:"31.25 Hz",  m:["0.280","4.363","2.525","53.89","0.719","5.14%","3.75%","0.986","2.620","−1.00"]},
-      {id:"hop1024", label:"1024", unit:"15.625 Hz", m:["0.422","5.148","1.564","62.54","0.611","15.43%","11.84%","0.968","2.394","−1.25"]},
-      {id:"hop2048", label:"2048", unit:"7.8 Hz",    m:["0.803","7.119","1.101","82.93","0.410","99.06%","87.79%","0.891","2.048","−3.00"]},
-      {id:"hop4096", label:"4096", unit:"3.9 Hz",    m:["1.222","8.859","1.054","100.83","0.237","102.70%","93.50%","0.843","1.868","−3.00"]},
-      {id:"hop8192", label:"8192", unit:"1.95 Hz",   m:["1.757","9.675","1.058","110.95","0.150","100.30%","91.16%","0.801","1.770","−3.00"]}
+      {id:"hop8192", label:"8192", unit:"2.0 Hz",  m:["1.757","9.675","1.058","110.95","0.150","100.30%","91.16%","0.801","1.770","−3.00","12"]},
+      {id:"hop4096", label:"4096", unit:"3.9 Hz",  m:["1.222","8.859","1.054","100.83","0.237","102.70%","93.50%","0.843","1.868","−3.00","24"]},
+      {id:"hop2048", label:"2048", unit:"7.8 Hz",  m:["0.803","7.119","1.101","82.93","0.410","99.06%","87.79%","0.891","2.048","−2.30","48"]},
+      {id:"hop1024", label:"1024", unit:"15.6 Hz", m:["0.422","5.148","1.564","62.54","0.611","15.43%","11.84%","0.968","2.394","−0.80","96"]},
+      {id:"hop512",  label:"512",  unit:"31.3 Hz", m:["0.280","4.363","2.525","53.89","0.719","5.14%","3.75%","0.986","2.620","−0.10","192"]},
+      {id:"hop256",  label:"256",  unit:"62.5 Hz", ref:true, m:["0.196","3.830","3.206","50.91","0.757","4.65%","3.42%","0.991","2.594","0.00","384"]}
     ]
   },
   {
-    key:"dimension", tag:"(c)", title:"Representation dimensionality",
-    cond:"H = 256, 500k updates. Continuous latent width D before quantization.",
-    unitHead:"Feature dim. D",
+    key:"dimension", tag:"(c)", title:"Feature dim",
+    cond:"Continuous latent width D before quantization.",
+    unitHead:"Feature dim D",
     rows:[
-      {id:"1",   label:"1",   m:["0.592","6.629","1.477","65.09","0.472","43.79%","33.81%","0.856","1.667","−3.00"]},
-      {id:"4",   label:"4",   m:["0.434","5.509","2.040","61.95","0.531","9.58%","7.23%","0.958","2.401","−1.40"]},
-      {id:"16",  label:"16",  m:["0.269","4.400","2.786","54.38","0.695","5.22%","3.78%","0.985","2.631","−0.60"]},
-      {id:"64",  label:"64",  m:["0.202","3.862","3.199","51.14","0.749","4.71%","3.56%","0.991","2.589","−0.25"]},
-      {id:"192", label:"192", ref:true, m:["0.196","3.830","3.206","50.91","0.757","4.65%","3.43%","0.991","2.595","0.00"]}
+      {id:"1",   label:"1",   m:["0.592","6.629","1.477","65.09","0.472","43.79%","33.81%","0.856","1.667","−2.20","2"]},
+      {id:"4",   label:"4",   m:["0.434","5.509","2.040","61.95","0.531","9.58%","7.23%","0.958","2.401","−1.00","8"]},
+      {id:"16",  label:"16",  m:["0.269","4.400","2.786","54.38","0.695","5.22%","3.78%","0.985","2.631","−0.10","32"]},
+      {id:"64",  label:"64",  m:["0.202","3.862","3.199","51.14","0.749","4.71%","3.56%","0.991","2.589","0.00","128"]},
+      {id:"192", label:"192", ref:true, m:["0.196","3.830","3.206","50.91","0.757","4.65%","3.42%","0.991","2.594","0.00","384"]}
     ]
   },
   {
-    key:"codebook", tag:"(d)", title:"Codebook size",
-    cond:"Single-stage VQ, joint training, 500k updates.",
-    unitHead:"Codebook K",
+    key:"codebook", tag:"(d)", title:"Codebook width",
+    cond:"Codebook size K of a single-stage, jointly trained quantizer.",
+    unitHead:"Codebook width K",
     rows:[
-      {id:"256",  label:"256",  m:["0.566","6.737","1.220","88.15","0.331","42.34%","33.65%","0.909","2.108","−3.00"]},
-      {id:"512",  label:"512",  m:["0.559","6.709","1.208","78.12","0.370","39.71%","31.63%","0.914","2.132","−2.75"]},
-      {id:"1024", label:"1024", m:["0.544","6.592","1.287","91.45","0.356","37.16%","29.68%","0.910","2.163","−2.50"]},
-      {id:"2048", label:"2048", m:["0.534","6.506","1.309","77.36","0.405","33.33%","26.33%","0.923","2.285","−1.50"]},
-      {id:"4096", label:"4096", m:["0.522","6.391","1.334","77.72","0.404","30.70%","24.41%","0.929","2.298","−1.00"]}
+      {id:"256",  label:"256",  m:["0.566","6.737","1.220","88.15","0.331","42.34%","33.65%","0.909","2.108","−2.10","0.50"]},
+      {id:"512",  label:"512",  m:["0.559","6.709","1.208","78.12","0.370","39.71%","31.63%","0.914","2.132","−2.10","0.56"]},
+      {id:"1024", label:"1024", m:["0.544","6.592","1.287","91.45","0.356","37.16%","29.68%","0.910","2.163","−2.55","0.63"]},
+      {id:"2048", label:"2048", m:["0.534","6.506","1.309","77.36","0.405","33.33%","26.33%","0.923","2.285","−1.75","0.69"]},
+      {id:"4096", label:"4096", m:["0.518","6.304","1.323","77.58","0.426","20.09%","13.63%","0.932","2.256","−1.70","0.75"]}
     ]
   },
   {
-    key:"rvq", tag:"(f)", title:"RVQ depth",
-    cond:"K = 4096, joint training, 100k updates. Number of residual quantizer stages.",
-    unitHead:"RVQ depth N",
+    key:"rvq", tag:"(f)", title:"Codebook depth",
+    cond:"Number of residual quantizer stages at K = 4096, jointly trained.",
+    unitHead:"Codebook depth N",
     rows:[
-      {id:"N1",  label:"1",  m:["0.518","6.304","1.323","77.58","0.426","20.09%","13.63%","0.932","2.256","−2.50"]},
-      {id:"N4",  label:"4",  m:["0.300","4.608","2.418","57.99","0.675","5.83%","4.33%","0.982","2.452","−1.50"]},
-      {id:"N8",  label:"8",  m:["0.246","4.202","2.826","53.75","0.715","4.89%","3.57%","0.988","2.641","0.00"]},
-      {id:"N16", label:"16", m:["0.216","4.003","3.099","54.01","0.738","4.14%","2.95%","0.990","2.613","0.00"]}
+      {id:"N1",  label:"1",  m:["0.518","6.304","1.323","77.58","0.426","20.09%","13.63%","0.932","2.256","−1.70","0.75"]},
+      {id:"N4",  label:"4",  m:["0.300","4.608","2.418","57.99","0.675","5.83%","4.33%","0.982","2.452","−0.35","3"]},
+      {id:"N8",  label:"8",  m:["0.246","4.202","2.826","53.75","0.715","4.89%","3.57%","0.988","2.641","−0.30","6"]},
+      {id:"N16", label:"16", m:["0.216","4.003","3.099","54.01","0.738","4.14%","2.95%","0.990","2.613","−0.10","12"]}
     ]
   }
 ];
@@ -382,6 +381,10 @@ function buildFactor(f){
     r.m.forEach(v=>tr.appendChild(el("td",null,String(v))));
     mtb.appendChild(tr);
   });
+  const gtm = el("tr","gt");
+  gtm.appendChild(el("td","setting","Ground truth"));
+  GT_ROW.forEach(v=>gtm.appendChild(el("td",null,v)));
+  mtb.appendChild(gtm);
   mt.appendChild(mtb);
   msc.appendChild(mt);
   d.appendChild(msc);
